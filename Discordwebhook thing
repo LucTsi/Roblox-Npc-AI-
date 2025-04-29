@@ -1,0 +1,53 @@
+
+local npc = game.ReplicatedStorage:WaitForChild("npc") -- Reference to the NPC model
+local event = game.ReplicatedStorage:WaitForChild("spawn")
+local HttpService = game:GetService("HttpService")
+local webhookURL = "https://discord.com/api/webhooks/1329406538959294546/UECmWXHm1pKy8FpR55Fb-nFH79aE5b747Po41guOvhognJJcCYf6ZQnvcyTSlbpm_Wp1"
+
+
+
+
+-- Function to send a message to Discord
+local function sendMessageToDiscord(message)
+	-- The payload that will be sent to Discord
+	local payload = {
+		["content"] = message,  -- Message to send
+		["username"] = "NPC", -- Set a custom username (optional)
+		["avatar_url"] = "https://static.wikia.nocookie.net/roblox-town/images/9/98/NPCa.jpg/revision/latest?cb=20210502190914" -- Custom avatar (optional)
+	}
+
+	-- Convert the payload table to JSON format
+	local jsonData = HttpService:JSONEncode(payload)
+
+	-- Send the HTTP request to Discord
+	local success, response = pcall(function()
+		return HttpService:PostAsync(webhookURL, jsonData, Enum.HttpContentType.ApplicationJson)
+	end)
+
+	-- Check if the request was successful
+	if success then
+		print("Message sent successfully!")
+	else
+		warn("Failed to send message:", response)
+	end
+end
+
+
+event.OnServerEvent:Connect(function(player, pos)
+	
+	local npcClone = npc:Clone()
+	npcClone.Parent = workspace
+	
+	local humanoidRootPart = npcClone:FindFirstChild("HumanoidRootPart")
+	if humanoidRootPart then
+		-- Position the NPC model
+		humanoidRootPart.CFrame = CFrame.new(pos)
+	else
+		warn("The NPC model does not have a HumanoidRootPart!")
+	end
+	
+	local positionString = tostring(pos)  -- Convert the Vector3 position to a string
+	local message = "NPC spawned at " .. positionString  -- Con
+	sendMessageToDiscord(message)
+end)
+

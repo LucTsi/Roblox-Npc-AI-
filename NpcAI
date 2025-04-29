@@ -1,0 +1,275 @@
+-- IMPORTANT VARIABLES AND SERVICES
+local NPC = require(game.ServerScriptService.NPC)
+local body = script.Parent
+local runService = game:GetService("RunService")
+local statsevent = game.ReplicatedStorage.stats
+
+
+
+
+-- THIS SECTION CREATES A NPC
+-- Randomly pick gender
+local gender = math.random(1, 2) == 1 and "Male" or "Female"
+-- Create NPC with random gender and matching name
+local npc = NPC.new("Human", "monkey", 100)
+
+
+print(npc)
+body.Humanoid.DisplayName = npc.Name
+npc.Speed = 10
+body.Humanoid.WalkSpeed = npc.Speed
+
+-- MAIN VARIABLES
+local workpart = workspace.work.Work
+local mode = npc.Activity
+local foodpart = workspace.Food
+local sleeppart = workspace.Bed
+
+local humanoid = script.Parent:WaitForChild("Humanoid")
+local walkanim = humanoid:WaitForChild("Walk") -- Assuming "Walk" is an Animation object
+local idleanim = humanoid:WaitForChild("Idle")
+
+local animator = humanoid:FindFirstChildOfClass("Animator")
+local walkAnimTrack = animator:LoadAnimation(walkanim)
+local idleAnimTrack = animator:LoadAnimation(idleanim)
+
+local clicked = false
+local clickdect = script.Parent.HumanoidRootPart:WaitForChild("ClickDetector")
+
+-- MAIN FUNCTIONS
+
+
+local function roundToOneDecimal(number)
+	return math.floor(number * 10 + 0.5) / 10
+end
+
+
+
+
+
+local function Patrol()
+	if mode == "Patroling" then
+		local wakparts = workspace.park:GetChildren()
+		local validParts = {}
+
+		-- Filter out non-BasePart objects
+		for _, part in ipairs(wakparts) do
+			if part:IsA("BasePart") then
+				table.insert(validParts, part)
+			end
+		end
+
+		if #validParts > 0 then
+			local randomIndex = math.random(1, #validParts)
+			local randompart = validParts[randomIndex]
+
+			-- Move NPC to random part and wait until it reaches the destination before continuing
+			npc:MoveTo(body, randompart)
+		end
+	end
+end
+
+local function Work()
+	-- Ensure the mode is 'Working' before proceeding
+	
+	task.wait()
+	if (mode == "GoWork" or mode == "Working") and npc.Mood.Energy.value >= 5 and npc.Money <= 40 then
+		task.wait()
+		-- Check if the NPC's money exceeds the tempmoney by 30 or more
+		if npc.Money > 40 then
+			print("Work is complete")
+			mode = "Idle"
+		else
+			mode = "Working"
+			
+			Work()
+		end
+	else
+		mode = "Idle"
+		print("NPC is not in Working mode")
+	end
+end
+
+local function GoWork()
+	-- Ensure the mode is 'GoWork'
+	if mode == "GoWork" then
+	
+		npc:MoveTo(body, workpart)
+		Work()
+	end
+end
+
+local function Eating()
+	
+	task.wait()
+	-- Ensure the mode is 'GoEat'
+	if mode == "GoEat" or mode == "Eating" then
+		task.wait()
+		-- Check if the NPC has enough money to buy food
+		if npc.Money >= 20 then
+			
+			-- Check if the NPC's hunger level and tempfood combined is greater than 30
+			if npc.Mood.Hunger.value > 50 then
+				print("Done eating")
+				-- Deduct the cost of food from NPC's money
+				npc.Money -= 20
+				mode = "Idle"
+			else
+				mode = "Eating"
+			
+				Eating()
+			end
+		else
+			-- If not enough money to buy food
+			print("No money to buy food. Current money: " .. npc.Money)
+			mode = "GoWork"  -- Change mode to GoWork to earn money
+			GoWork()  -- Go to work to earn money
+		end
+	else
+		mode = "Idle"
+		print("NPC is not in GoEat mode")
+	end
+end
+
+local function GoEat()
+	-- Ensure the mode is 'GoEat'
+	if mode == "GoEat" then
+		-- Store the NPC's current hunger level as tempfood
+		
+		
+
+		-- Move the NPC to the designated food part
+		npc:MoveTo(body, foodpart) -- Ensure `npc:MoveTo` is defined properly
+
+		-- Once the NPC reaches the food, transition to 'Eating' mode
+		-- You might handle this in the MoveToFinished callback
+		Eating() -- Call Eating after moving to the food part
+	else
+		print("NPC is not in GoEat mode")
+	end
+end
+
+local function Sleep()
+	
+	task.wait()
+	if mode == "GoSleep" or mode == "Sleeping" then
+		
+		task.wait()
+		if npc.Mood.Energy.value >= 90 then
+		
+			mode  = "Idle"
+		else
+			mode = "Sleeping"
+		
+			Sleep()
+		end
+	else
+		mode = "Idle"
+	
+	end
+end
+
+local function GoSleep()
+	if mode == "GoSleep" then
+	
+		npc:MoveTo(body, sleeppart) -- Ensure `npc:MoveTo` is defined properly
+		
+		Sleep()
+	
+	else
+		print("not go sleep")
+	end
+	
+end
+
+
+-- MAIN LOOP WITH PRIORITY SYSTEM
+local function MainLoop()
+	while true do
+		-- Priority system: Check in order of importance
+		if npc.Mood.Hunger.value < 30 and mode ~= "Working" and mode ~= "GoWork" then
+			mode = "GoEat"  -- Highest priority, go to eat
+			GoEat()
+			walkAnimTrack:Play()
+		elseif npc.Mood.Energy.value < 20 and mode ~= "Working" and mode ~= "GoEat" and mode ~= "Eating" then
+			mode = "GoSleep"  -- Second priority, go sleep
+			GoSleep()
+			walkAnimTrack:Play()
+		elseif mode ~= "Eating" and mode ~= "GoEat" and mode ~= "Sleeping" and mode ~= "GoSleep" and npc.Mood.Energy.value > 50 and npc.Money <= 40 then
+			mode = "GoWork"
+			GoWork()
+			walkAnimTrack:Play()
+		
+		elseif mode ~= "Working" and mode ~= "GoWork" and mode ~= "Eating" and mode ~= "GoEat" and mode ~= "Sleeping" and mode ~= "GoSleep" or mode == "Idle" then
+			mode = "Patroling"  -- Default action, patrol
+			Patrol()  -- Call Patrol function when mode is Patroling
+			walkAnimTrack:Play()
+		end
+
+		-- Debug: Print current mode
+		print("NPC mode: " .. mode)
+
+		-- Add a wait to prevent infinite tight loop
+		wait(1)
+	end
+end
+
+-- MOOD LOOP
+local function MoodLoop()
+	while true do
+		if mode == "Patroling" then
+			
+			npc.Mood.Energy.value = math.max(npc.Mood.Energy.value - (npc.Mood.Energy.priority / 100), 0) -- Slower drain
+			npc.Mood.Boredom.value = math.max(npc.Mood.Boredom.value - (npc.Mood.Boredom.priority / 200), 0)
+			npc.Mood.Happiness.value = math.max(npc.Mood.Happiness.value + (npc.Mood.Happiness.priority / 500), 0)
+		elseif mode == "Working" then
+			npc.Mood.Energy.value = math.max(npc.Mood.Energy.value - (npc.Mood.Energy.priority / 10), 0) -- Moderate drain
+			npc.Money += 5 -- Increment money at a slower pace
+			npc.Mood.Boredom.value = math.max(npc.Mood.Boredom.value + (npc.Mood.Happiness.priority / 100), 0)
+			npc.Mood.Happiness.value = math.max(npc.Mood.Happiness.value - (npc.Mood.Happiness.priority / 150), 0)
+		elseif mode == "Sleeping" then
+			npc.Mood.Energy.value = math.min(npc.Mood.Energy.value + (npc.Mood.Energy.priority / 5), 100) -- Slow recovery
+			npc.Mood.Happiness.value = math.min(npc.Mood.Happiness.value + (npc.Mood.Happiness.priority / 500), 100)
+		elseif mode == "Eating" then
+			npc.Mood.Energy.value = math.min(npc.Mood.Energy.value + (npc.Mood.Energy.priority / 15), 100) -- Gradual gain
+			npc.Mood.Hunger.value = math.min(npc.Mood.Hunger.value + (npc.Mood.Hunger.priority / 5), 100)
+			npc.Mood.Happiness.value = math.max(npc.Mood.Happiness.value + (npc.Mood.Happiness.priority / 500), 0)
+		end
+
+		-- Decrease hunger gradually
+		wait(1.3)
+		if mode == "Sleeping" then
+			npc.Mood.Hunger.value = math.max(npc.Mood.Hunger.value - (npc.Mood.Hunger.priority / 200), 0)
+		else
+			npc.Mood.Hunger.value = math.max(npc.Mood.Hunger.value - (npc.Mood.Hunger.priority / 100), 0)
+		end
+		-- Ensure all values are rounded to one decimal place
+		npc.Mood.Energy.value = roundToOneDecimal(npc.Mood.Energy.value)
+		npc.Mood.Hunger.value = roundToOneDecimal(npc.Mood.Hunger.value)
+		npc.Mood.Boredom.value = roundToOneDecimal(npc.Mood.Boredom.value)
+		npc.Mood.Happiness.value = roundToOneDecimal(npc.Mood.Happiness.value)
+
+		-- Fire the event to update the UI
+		
+		clickdect.MouseClick:Connect(function()
+			clicked = not clicked
+		end)
+		if clicked then
+			statsevent:FireAllClients(
+				mode,
+				npc.Mood.Energy.value,
+				npc.Mood.Hunger.value,
+				npc.Mood.Boredom.value,
+				npc.Mood.Happiness.value,
+				npc.Money,
+				npc.Name
+			)
+		end
+	
+	end
+end
+
+
+-- LOOP SPAWN
+task.spawn(MainLoop)
+task.spawn(MoodLoop)

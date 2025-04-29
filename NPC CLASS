@@ -1,0 +1,157 @@
+local NPC = {}
+NPC.__index = NPC
+
+
+-- Constructor
+function NPC:Human(name, gender, age, health, speed, activity, money, strength)
+	local self = setmetatable({}, NPC)
+	self.Gender = gender or "Male"
+	self.Name = name or NPC:GenerateRandomName(self.Gender)
+	self.Age = age or 0
+	self.Speed = speed or 5
+	self.Activity = activity or "Idle" -- Current activity of the NPC
+	self.Money = money or 0 -- Default to 0 if no value is provided
+	self.strength = strength or 11
+	
+	-- Mood and Needs
+	self.Mood = {
+		Hunger = {value = 100, priority = 50},  -- 1 = highest priority
+		Energy = {value = 80, priority = 50},
+		Happiness = {value = 50, priority = 50},
+		Boredom = {value = 50, priority = 50}
+	}
+
+	return self
+end
+
+function NPC:Elfs(name, gender, age, health, speed, activity, money, mana, strength)
+	local self = setmetatable({}, NPC)
+	self.Gender = gender or "Male"
+	self.Name = name or NPC:GenerateRandomName(self.Gender)
+	self.Age = age or 0
+	self.Speed = speed or 5
+	self.Activity = activity or "Idle" -- Current activity of the NPC
+	self.Money = money or 0 -- Default to 0 if no value is provided
+	self.Mana = mana or 10
+	self.strength = strength or 8
+	-- Mood and Needs
+	self.Mood = {
+		Hunger = {value = 100, priority = 1},  -- 1 = highest priority
+		Energy = {value = 80, priority = 2},
+		Happiness = {value = 50, priority = 4},
+		Boredom = {value = 50, priority = 5}
+	}
+
+	return self
+end
+
+function NPC:Barbarian(name, gender, age, health, speed, activity, money, strength)
+	local self = setmetatable({}, NPC)
+	self.Gender = gender or "Male"
+	self.Name = name or NPC:GenerateRandomName(self.Gender)
+	self.Age = age or 0
+	self.Speed = speed or 7
+	self.Activity = activity or "Idle" -- Current activity of the NPC
+	self.Money = money or 0 -- Default to 0 if no value is provided
+	self.strength = strength or 20
+	-- Mood and Needs
+	self.Mood = {
+		Hunger = {value = 100, priority = 0.5},  -- 1 = highest priority
+		Energy = {value = 80, priority = 10},
+		Happiness = {value = 50, priority = 4},
+		Boredom = {value = 50, priority = 5}
+	}
+
+	return self
+end
+
+
+
+function NPC.new(race, JobName, pay, name, gender, age, health, speed, activity, money, strength, mana)
+	local obj = nil
+	if race == "Human" then
+		obj = setmetatable(NPC.Human(name, gender, age, health, speed, activity, money), NPC)
+	elseif	race == "Elf" then
+		obj = setmetatable(NPC.Elfs(name, gender, age, health, speed, activity, money, mana, strength), NPC)
+	else
+		obj = setmetatable(NPC.Human(name, gender, age, health, speed, activity, money), NPC)
+	end
+	
+	obj.JobName = JobName or "Unemployed"
+	obj.Pay = pay or 0
+	return obj
+end
+
+
+
+function NPC:GenerateRandomName(gender)
+	local maleFirstNames = {"Alex", "Jordan", "Taylor", "Casey", "Morgan", "Jamie", "Drew", "Riley"}
+	local femaleFirstNames = {"Emily", "Sophia", "Isabella", "Olivia", "Emma", "Ava", "Mia", "Charlotte"}
+	local lastNames = {"Smith", "Johnson", "Brown", "Williams", "Jones", "Miller", "Davis", "Garcia"}
+
+	local firstName
+	if gender == "Male" then
+		firstName = maleFirstNames[math.random(1, #maleFirstNames)]
+	elseif gender == "Female" then
+		firstName = femaleFirstNames[math.random(1, #femaleFirstNames)]
+	else
+		firstName = "Taylor" -- Default gender-neutral name
+	end
+
+	local lastName = lastNames[math.random(1, #lastNames)]
+	return firstName .. " " .. lastName
+end
+
+function NPC:TakeDamage(amount)
+	self.Health = math.max(self.Health - amount, 0)
+	if self.Health == 0 then
+		self:Die()
+	end
+end
+
+function NPC:Heal(amount)
+	self.Health = math.min(self.Health + amount, self.MaxHealth)
+end
+
+
+
+
+function NPC:MoveTo(body, destination)
+	local humanoid = body:FindFirstChild("Humanoid")
+	local pathfindingService = game:GetService("PathfindingService")
+	body.PrimaryPart:SetNetworkOwner(nil)
+	
+	local pfs = game:GetService("PathfindingService")
+	local NPC = body
+	local part = destination
+	local walkanim = humanoid:WaitForChild("Walk") -- Assuming "Walk" is an Animation object
+	local idleanim = humanoid:WaitForChild("Idle")
+
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	local walkAnimTrack = animator:LoadAnimation(walkanim)
+	local idleAnimTrack = animator:LoadAnimation(idleanim)
+	
+	
+	
+	if humanoid then
+		if body.Humanoid.Health > 0 then  -- Check if the NPC is alive
+
+			local path = pfs:CreatePath()
+			path:ComputeAsync(NPC.HumanoidRootPart.Position, part.Position)
+			
+			for _, waypoint in pairs (path:GetWaypoints()) do
+				
+				NPC.Humanoid:MoveTo(waypoint.Position)
+				
+				NPC.Humanoid.MoveToFinished:Wait()
+				walkAnimTrack:Stop()
+				idleAnimTrack:Play()
+			end
+		end
+
+			
+	end
+end
+
+
+return NPC
